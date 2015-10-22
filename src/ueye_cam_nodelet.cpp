@@ -104,6 +104,7 @@ UEyeCamNodelet::UEyeCamNodelet() :
   cam_params_.frame_rate = DEFAULT_FRAME_RATE;
   cam_params_.pixel_clock = DEFAULT_PIXEL_CLOCK;
   cam_params_.ext_trigger_mode = false;
+  cam_params_.ext_trigger_delay = 0;
   cam_params_.flash_delay = 0;
   cam_params_.flash_duration = DEFAULT_FLASH_DURATION;
   cam_params_.flip_upd = false;
@@ -185,6 +186,7 @@ void UEyeCamNodelet::onInit() {
       "Flash Delay (us):\t" << cam_params_.flash_delay << endl <<
       "Flash Duration (us):\t" << cam_params_.flash_duration << endl <<
       "Ext Trigger Mode:\t" << cam_params_.ext_trigger_mode << endl <<
+      "Ext Trigger Delay (us):\t" << cam_params_.ext_trigger_delay << endl <<
       "Auto Frame Rate:\t" << cam_params_.auto_frame_rate << endl <<
       "Frame Rate (Hz):\t" << cam_params_.frame_rate << endl <<
       "Pixel Clock (MHz):\t" << cam_params_.pixel_clock << endl <<
@@ -895,7 +897,7 @@ void UEyeCamNodelet::frameGrabLoop() {
     currNumSubscribers = ros_cam_pub_.getNumSubscribers();
     if (currNumSubscribers > 0 && prevNumSubscribers <= 0) {
       if (cam_params_.ext_trigger_mode) {
-        if (setExtTriggerMode(cam_params_.frame_rate, cam_params_.flash_delay) != IS_SUCCESS) {
+        if (setExtTriggerMode(cam_params_.frame_rate, cam_params_.ext_trigger_delay) != IS_SUCCESS) {
           ERROR_STREAM("Shutting down driver nodelet for [" << cam_name_ << "]");
           ros::shutdown();
           return;
