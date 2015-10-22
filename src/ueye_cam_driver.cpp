@@ -829,6 +829,7 @@ INT UEyeCamDriver::setExtTriggerMode(double frame_rate, INT trigger_delay) {
   if (!isConnected()) return IS_INVALID_CAMERA_HANDLE;
 
   INT is_err = IS_SUCCESS;
+  INT min_delay, max_delay;
 //INFO_STREAM("[DEBUG]: cam_name: " << cam_name_);
   if (!extTriggerModeActive()) {
     setStandbyMode(); // No need to check for success
@@ -863,7 +864,10 @@ INT UEyeCamDriver::setExtTriggerMode(double frame_rate, INT trigger_delay) {
     }
 
     /* Set trigger delay */
-    if ((is_err = is_SetTriggerDelay(cam_handle_, (INT) trigger_delay)) != IS_SUCCESS) {
+    min_delay = is_SetTriggerDelay(cam_handle_, IS_GET_MIN_TRIGGER_DELAY);
+    max_delay = is_SetTriggerDelay(cam_handle_, IS_GET_MAX_TRIGGER_DELAY);
+    if ((is_err = is_SetTriggerDelay(cam_handle_, (INT) trigger_delay)) != IS_SUCCESS && (trigger_delay>=min_delay && trigger_delay<=max_delay)) {
+      INFO_STREAM("Min delay: " << min_delay << "us - Max delay: " << max_delay << "us");
       ERROR_STREAM("Could not set trigger-delay for [" <<
         cam_name_ << "] (" << err2str(is_err) << ")");
       return is_err;
