@@ -868,7 +868,7 @@ INT UEyeCamDriver::setExtTriggerMode(double frame_rate, INT trigger_delay) {
         cam_name_ << "] (" << err2str(is_err) << ")");
       return is_err;
     }
-    INFO_STREAM("[" <<cam_name_ << "] external trigger delay of " << trigger_delay);
+    INFO_STREAM("[" <<cam_name_ << "] external trigger delay of " << is_SetTriggerDelay(cam_handle_, IS_GET_TRIGGER_DELAY) << "us");
 
     if ((is_err = is_CaptureVideo(cam_handle_, IS_DONT_WAIT)) != IS_SUCCESS) {
       ERROR_STREAM("Could not start external trigger live video mode for [" <<
