@@ -1,10 +1,11 @@
 <launch>
-  <node pkg="nodelet" type="nodelet" name="nodelet_manager" args="manager" output="screen" />
+  <node pkg="nodelet" type="nodelet" name="nodelet_manager" args="manager" output="screen"/>
   
   <node pkg="nodelet" type="nodelet" name="ueye_cam_nodelet_left"
         args="load ueye_cam/ueye_cam_nodelet nodelet_manager">
     <param name="camera_name" type="str" value="stereo/left" /> <!-- == namespace for topics and services -->
     <param name="camera_topic" type="str" value="image_raw" />
+    <param name="master" type="bool" value="true" />
     <param name="camera_id" type="int" value="2" /> <!-- 0 = any camera; 1+: camera ID -->
     <param name="camera_intrinsics_file" type="string" value="" /> <!-- default: ~/.ros/camera_info/<camera_name>.yaml -->
     <param name="camera_parameters_file" type="string" value="" /> <!-- default: ~/.ros/camera_conf/<camera_name>.ini -->
@@ -40,7 +41,7 @@
     <param name="gain_boost" type="bool" value="False" />
 
     <param name="auto_exposure" type="bool" value="False" />
-    <param name="exposure" type="int" value="33" /> <!-- in ms -->
+    <param name="exposure" type="int" value="16" /> <!-- in ms -->
 
     <param name="auto_white_balance" type="bool" value="True" />
     <param name="white_balance_red_offset" type="int" value="0" />
@@ -50,14 +51,17 @@
     <param name="flash_duration" type="int" value="1000" /> <!-- in us -->
     
     <param name="auto_frame_rate" type="bool" value="False" />
-    <param name="frame_rate" type="double" value="15.0" />
-    <param name="pixel_clock" type="int" value="30" />
+    <param name="frame_rate" type="double" value="30.0" />
+    <param name="pixel_clock" type="int" value="86" />
   </node>
+
+
 
   <node pkg="nodelet" type="nodelet" name="ueye_cam_nodelet_right"
         args="load ueye_cam/ueye_cam_nodelet nodelet_manager">
     <param name="camera_name" type="str" value="stereo/right" /> <!-- == namespace for topics and services -->
     <param name="camera_topic" type="str" value="image_raw" />
+    <param name="master" type="bool" value="false" />
     <param name="camera_id" type="int" value="1" /> <!-- 0 = any camera; 1+: camera ID -->
     <param name="camera_intrinsics_file" type="string" value="" /> <!-- default: ~/.ros/camera_info/<camera_name>.yaml -->
     <param name="camera_parameters_file" type="string" value="" /> <!-- default: ~/.ros/camera_conf/<camera_name>.ini -->
@@ -92,7 +96,7 @@
     <param name="gain_boost" type="bool" value="False" />
 
     <param name="auto_exposure" type="bool" value="False" />
-    <param name="exposure" type="int" value="33" /> <!-- in ms -->
+    <param name="exposure" type="int" value="16" /> <!-- in ms -->
 
     <param name="auto_white_balance" type="bool" value="True" />
     <param name="white_balance_red_offset" type="int" value="0" />
@@ -102,7 +106,7 @@
     <param name="flash_duration" type="int" value="1000" /> <!-- in us -->
     
     <param name="auto_frame_rate" type="bool" value="False" /> <!-- frame rate settings are ignored in camera_ext_trigger_mode -->
-    <param name="frame_rate" type="double" value="15.0" /> <!-- frame rate settings are ignored in camera_ext_trigger_mode -->
-    <param name="pixel_clock" type="int" value="30" />
+    <param name="frame_rate" type="double" value="30.0" /> <!-- frame rate settings are ignored in camera_ext_trigger_mode -->
+    <param name="pixel_clock" type="int" value="86" />
   </node>
 </launch>

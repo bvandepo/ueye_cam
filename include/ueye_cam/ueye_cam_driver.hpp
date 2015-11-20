@@ -310,7 +310,7 @@ public:
    *
    * \return IS_SUCCESS if successful, error flag otherwise (see err2str).
    */
-  INT setExtTriggerMode(double frame_rate, INT trigger_delay);
+  INT setExtTriggerMode(double frame_rate, INT trigger_delay, bool master);
 
   /**
    * Disables either free-run or external trigger mode, and sets the current
@@ -342,7 +342,7 @@ public:
    *
    * \return IS_SUCCESS if successful, error flag otherwise.
    */
-  INT GPIOPWMConfig(HIDS hCam, double frame_rate, INT trigger_delay);
+  INT GPIOPWMConfig(HIDS hCam, double frame_rate, bool active);
 
   /**
    * Sets the GPIO 2 as INPUT.
@@ -434,6 +434,9 @@ protected:
 
   HIDS cam_handle_;
   SENSORINFO cam_sensor_info_;
+  int cam_nb_image_seq_;
+  char** cam_seq_buffer_;
+  int* cam_seq_buffer_id_;
   char* cam_buffer_;
   int cam_buffer_id_;
   INT cam_buffer_pitch_;

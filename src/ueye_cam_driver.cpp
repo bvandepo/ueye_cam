@@ -58,7 +58,6 @@ namespace ueye_cam {
 // by syncCamConfig() during connectCam()
 UEyeCamDriver::UEyeCamDriver(int cam_ID, string cam_name) :
     cam_handle_((HIDS) 0),
-    cam_buffer_(NULL),
     cam_buffer_id_(0),
     cam_buffer_pitch_(0),
     cam_buffer_size_(0),
@@ -72,11 +71,24 @@ UEyeCamDriver::UEyeCamDriver(int cam_ID, string cam_name) :
   cam_aoi_.s32Y = 0;
   cam_aoi_.s32Width = 640;
   cam_aoi_.s32Height = 480;
+  cam_nb_image_seq_ = 10;
+
+  cam_seq_buffer_ = new char*[cam_nb_image_seq_];
+  cam_seq_buffer_id_ = new int[cam_nb_image_seq_];
+  for(int i=0;i<cam_nb_image_seq_;i++){
+      cam_seq_buffer_[i] = NULL;
+      cam_seq_buffer_id_[i] = 0;
+  }
+  cam_buffer_ = new char[cam_aoi_.s32Width*cam_aoi_.s32Height*bits_per_pixel_/8];
+  memset(cam_buffer_, cam_aoi_.s32Width*cam_aoi_.s32Height*bits_per_pixel_/8, 0);
 }
 
 
 UEyeCamDriver::~UEyeCamDriver() {
   disconnectCam();
+  delete [] cam_seq_buffer_;
+  delete [] cam_seq_buffer_id_;
+  delete [] cam_buffer_;
 }
 
 
@@ -155,11 +167,17 @@ INT UEyeCamDriver::disconnectCam() {
   if (isConnected()) {
     setStandbyMode();
 
+    // Exit the image queue and clear sequence
+    is_err = is_ExitImageQueue(cam_handle_);
+    is_err = is_ClearSequence(cam_handle_);
+
     // Release existing camera buffers
-    if (cam_buffer_ != NULL) {
-      is_err = is_FreeImageMem(cam_handle_, cam_buffer_, cam_buffer_id_);
+    for(int i=0;i<cam_nb_image_seq_; i++){
+        if (cam_seq_buffer_[i] != NULL) {
+          is_err = is_FreeImageMem(cam_handle_, cam_seq_buffer_[i], cam_seq_buffer_id_[i]);
+        }
+        cam_seq_buffer_[i] = NULL;
     }
-    cam_buffer_ = NULL;
 
     // Release camera handle
     is_err = is_ExitCamera(cam_handle_);
@@ -825,7 +843,7 @@ INT UEyeCamDriver::setFreeRunMode() {
 }
 
 
-INT UEyeCamDriver::setExtTriggerMode(double frame_rate, INT trigger_delay) {
+INT UEyeCamDriver::setExtTriggerMode(double frame_rate, INT trigger_delay, bool master) {
   if (!isConnected()) return IS_INVALID_CAMERA_HANDLE;
 
   INT is_err = IS_SUCCESS;
@@ -840,11 +858,11 @@ INT UEyeCamDriver::setExtTriggerMode(double frame_rate, INT trigger_delay) {
       return is_err;
     }
 
-    /* If "master" set the GPIO1 to generate PWM */ 
-    if(cam_name_ == "stereo/left"){
+    /* If "master" set the GPIO1 to generate PWM */
+    if(master){
         INFO_STREAM("[" << cam_name_ << "] GPIO1 configured as output (PWM) at " << frame_rate << "hz");
-        if(GPIOPWMConfig(cam_handle_, frame_rate, trigger_delay) != IS_SUCCESS){
-            ERROR_STREAM("Could not set GPIO 1 as outpu (PWM) for " << cam_name_ << "as output" << ")");
+        if(GPIOPWMConfig(cam_handle_, frame_rate, true) != IS_SUCCESS){
+            ERROR_STREAM("Could not set GPIO 1 as output (PWM) for " << cam_name_ << "as output" << ")");
             return is_err;
         }
     }
@@ -919,6 +937,14 @@ INT UEyeCamDriver::setStandbyMode() {
   INT is_err = IS_SUCCESS;
 
   if (extTriggerModeActive()) {
+//      /* set the GPIO1 to generate PWM */
+//      INFO_STREAM("[" << cam_name_ << "] output (PWM) stop)");
+//      if((is_err = GPIOPWMConfig(cam_handle_, 0, false)) != IS_SUCCESS){
+//          ERROR_STREAM("Could not set GPIO 1 as outpu (PWM) for " << cam_name_ << "as output" << ")");
+//          return is_err;
+//      }
+
+
       if ((is_err = is_DisableEvent(cam_handle_, IS_SET_EVENT_FRAME)) != IS_SUCCESS) {
         ERROR_STREAM("Could not disable frame event for [" << cam_name_ <<
           "] (" << err2str(is_err) << ")");
@@ -955,6 +981,7 @@ INT UEyeCamDriver::setStandbyMode() {
       return is_err;
     }
     DEBUG_STREAM("Stopped free-run live video mode for [" << cam_name_ << "]");
+
   }
   if ((is_err = is_CameraStatus(cam_handle_, IS_STANDBY, IS_GET_STATUS)) != IS_SUCCESS) {
     ERROR_STREAM("Could not set standby mode for [" << cam_name_ <<
@@ -971,20 +998,50 @@ const char* UEyeCamDriver::processNextFrame(INT timeout_ms) {
 
   INT is_err = IS_SUCCESS;
 
-  // Wait for frame event
-  if ((is_err = is_WaitEvent(cam_handle_, IS_SET_EVENT_FRAME,
-        timeout_ms)) != IS_SUCCESS) {
-    if (is_err == IS_TIMED_OUT) {
-      ERROR_STREAM("Timed out while acquiring image from [" << cam_name_ <<
-        "] (" << err2str(is_err) << ")");
-      ERROR_STREAM("If this is occurring frequently, see https://github.com/anqixu/ueye_cam/issues/6#issuecomment-49925549");
-    } else {
-      ERROR_STREAM("Failed to acquire image from [" << cam_name_ <<
-        "] (" << err2str(is_err) << ")");
-    }
-    return NULL;
-  }
+  bool method_is_WaitEvent(0);
+  char* temp_buffer = NULL;
 
+  // Wait for frame event
+  if(method_is_WaitEvent){
+      if ((is_err = is_WaitEvent(cam_handle_, IS_SET_EVENT_FRAME,
+            timeout_ms)) != IS_SUCCESS) {
+        if (is_err == IS_TIMED_OUT) {
+          ERROR_STREAM("Timed out while acquiring image from [" << cam_name_ <<
+            "] (" << err2str(is_err) << ")");
+          ERROR_STREAM("If this is occurring frequently, see https://github.com/anqixu/ueye_cam/issues/6#issuecomment-49925549");
+        } else {
+          ERROR_STREAM("Failed to acquire image from [" << cam_name_ <<
+            "] (" << err2str(is_err) << ")");
+        }
+        return NULL;
+      }
+  }
+  else{
+      if ((is_err = is_WaitForNextImage(cam_handle_, 1000, &temp_buffer, &cam_buffer_id_))
+              != IS_SUCCESS) {
+          if (is_err == IS_TIMED_OUT) {
+            ERROR_STREAM("Timed out while acquiring image from [" << cam_name_ <<
+              "] (" << err2str(is_err) << ")");
+            ERROR_STREAM("If this is occurring frequently, see https://github.com/anqixu/ueye_cam/issues/6#issuecomment-49925549");
+          } else {
+            ERROR_STREAM("Failed to acquire image from [" << cam_name_ <<
+              "] (" << err2str(is_err) << ")");
+          }
+          return NULL;
+      }
+
+      // copy the buffer
+      memcpy(cam_buffer_, temp_buffer, cam_buffer_size_);/*cam_aoi_.s32Height*cam_aoi_.s32Width*3 bits_per_pixel_/8*/
+
+      // Unlock the buffer which has been automatically locked by is_WaitForNextImage()
+      if ((is_err = is_UnlockSeqBuf (cam_handle_, IS_IGNORE_PARAMETER, temp_buffer))
+              != IS_SUCCESS) {
+          ERROR_STREAM("Failed to unlock image buffer from [" << cam_name_ <<
+            "] (" << err2str(is_err) << ")");
+      }
+
+
+  }
   return cam_buffer_;
 }
 
@@ -1088,9 +1145,11 @@ INT UEyeCamDriver::reallocateCamBuffer() {
   setStandbyMode();
 
   // Free existing memory from previous calls to reallocateCamBuffer()
-  if (cam_buffer_ != NULL) {
-    is_err = is_FreeImageMem(cam_handle_, cam_buffer_, cam_buffer_id_);
-    cam_buffer_ = NULL;
+  for(int i=0;i<cam_nb_image_seq_; i++){
+      if (cam_seq_buffer_[i] != NULL) {
+        is_err = is_FreeImageMem(cam_handle_, cam_seq_buffer_[i], cam_seq_buffer_id_[i]);
+      }
+      cam_seq_buffer_[i] = NULL;
   }
   
   // Query camera's current resolution settings, for redundancy
@@ -1106,19 +1165,33 @@ INT UEyeCamDriver::reallocateCamBuffer() {
     (cam_sensor_scaling_rate_ * cam_subsampling_rate_);
   INT frameHeight = cam_aoi_.s32Height /
     (cam_sensor_scaling_rate_ * cam_subsampling_rate_);
-  if ((is_err = is_AllocImageMem(cam_handle_, frameWidth, frameHeight,
-      bits_per_pixel_, &cam_buffer_, &cam_buffer_id_)) != IS_SUCCESS) {
-    ERROR_STREAM("Failed to allocate " << frameWidth << " x " << frameHeight <<
-      " image buffer for [" << cam_name_ << "]");
-    return is_err;
+  is_err = is_ClearSequence(cam_handle_);
+  for(int i=0; i<cam_nb_image_seq_; i++){
+      if ((is_err = is_AllocImageMem(cam_handle_, frameWidth, frameHeight,
+          bits_per_pixel_, &(cam_seq_buffer_[i]), &(cam_seq_buffer_id_[i]))) != IS_SUCCESS) {
+        ERROR_STREAM("Failed to allocate " << frameWidth << " x " << frameHeight <<
+          " image buffer for [" << cam_name_ << "]");
+        return is_err;
+      }
+      if ((is_err = is_AddToSequence(cam_handle_, cam_seq_buffer_[i], cam_seq_buffer_id_[i])) !=IS_SUCCESS) {
+          ERROR_STREAM("Failed to add sequence " <<
+            " image buffer for [" << cam_name_ << "]");
+          return is_err;
+      }
   }
   
-  // Tell IDS driver to use allocated memory section as frame buffer
-  if ((is_err = is_SetImageMem(cam_handle_, cam_buffer_, cam_buffer_id_)) != IS_SUCCESS) {
-    ERROR_STREAM("Failed to associate image buffer to IDS driver for [" <<
-      cam_name_ << "] (" << err2str(is_err) << ")");
-    return is_err;
+  // Initialize the image queue
+  if ((is_err = is_InitImageQueue(cam_handle_, 0)) != IS_SUCCESS){
+      ERROR_STREAM("Failed to initialize image queue for [" << cam_name_ << "]");
+      return is_err;
   }
+
+//  // Tell IDS driver to use allocated memory section as frame buffer
+//  if ((is_err = is_SetImageMem(cam_handle_, cam_buffer_, cam_buffer_id_)) != IS_SUCCESS) {
+//    ERROR_STREAM("Failed to associate image buffer to IDS driver for [" <<
+//      cam_name_ << "] (" << err2str(is_err) << ")");
+//    return is_err;
+//  }
   
   // Synchronize internal settings for buffer step size and overall buffer size
   // NOTE: assume that sensor_scaling_rate, subsampling_rate, and cam_binning_rate_
@@ -1142,6 +1215,10 @@ INT UEyeCamDriver::reallocateCamBuffer() {
     "\n  buffer step/pitch/stride: " << cam_buffer_pitch_ <<
     "\n  expected bits per pixel: " << bits_per_pixel_ <<
     "\n  expected buffer size: " << cam_buffer_size_);
+
+  delete[] cam_buffer_;
+  cam_buffer_ = new char[cam_buffer_size_];
+  memset(cam_buffer_, cam_buffer_size_, 0);
 
   return is_err;
 }
@@ -1322,7 +1399,7 @@ bool UEyeCamDriver::getTimestamp(UEYETIME *timestamp) {
   return false;
 }
 
-INT UEyeCamDriver::GPIOPWMConfig(HIDS hCam, double frame_rate, INT trigger_delay){
+INT UEyeCamDriver::GPIOPWMConfig(HIDS hCam, double frame_rate, bool active){
 
     // FOR THE GPIO 1 : OUTPUT
 
@@ -1344,7 +1421,8 @@ INT UEyeCamDriver::GPIOPWMConfig(HIDS hCam, double frame_rate, INT trigger_delay
 
     // Set the values of the PWM parameters
     m_pwmParams.dblFrequency_Hz = frame_rate;
-    m_pwmParams.dblDutyCycle = 0.1; //TODO: What does the duty change?
+    m_pwmParams.dblDutyCycle = 0.1; //TODO: What does the duty change?(active ? 0.1:0)
+    std::cout<<"active PWM : "<<active<<std::endl;
     nRet = is_IO(hCam, IS_IO_CMD_PWM_SET_PARAMS,
                 (void*)&m_pwmParams, sizeof(m_pwmParams));
     if(nRet != IS_SUCCESS){ std::cout << "error : pwm not set." << std::endl;}

@@ -51,6 +51,7 @@
 #include <camera_calibration_parsers/parse.h>
 #include <sensor_msgs/fill_image.h>
 #include <sensor_msgs/image_encodings.h>
+#include <iostream>
 
 
 //#define DEBUG_PRINTOUT_FRAME_GRAB_RATES
@@ -446,6 +447,12 @@ INT UEyeCamNodelet::parseROSParams(ros::NodeHandle& local_nh) {
       }
     }
   }
+  if (local_nh.hasParam("master")) {
+    local_nh.getParam("master", cam_params_.master);
+    if (cam_params_.master != prevCamParams.master) {
+        hasNewParams = true;
+    }
+  }
   if (local_nh.hasParam("flip_upd")) {
     local_nh.getParam("flip_upd", cam_params_.flip_upd);
     if (cam_params_.flip_upd != prevCamParams.flip_upd) {
@@ -651,6 +658,16 @@ INT UEyeCamNodelet::syncCamConfig(string dft_mode_str) {
   INT is_err;
   
   if ((is_err = UEyeCamDriver::syncCamConfig(dft_mode_str)) != IS_SUCCESS) return is_err;
+
+//  // Set external trigger
+//  if (cam_params_.ext_trigger_mode) {
+//      if ((is_err = setExtTriggerMode(cam_params_.frame_rate, cam_params_.ext_trigger_delay, cam_params_.master)) != IS_SUCCESS) {
+//        ERROR_STREAM("Shutting down driver nodelet for [" << cam_name_ << "]");
+//        ros::shutdown();
+//        return is_err;
+//      }
+//      INFO_STREAM("[" << cam_name_ << "] set to external trigger mode");
+//  }
   
   // Update ROS color mode string
   INT query = is_SetColorMode(cam_handle_, IS_GET_COLOR_MODE);
@@ -895,14 +912,23 @@ void UEyeCamNodelet::frameGrabLoop() {
     // Initialize live video mode if camera was previously asleep, and ROS image topic has subscribers;
     // and stop live video mode if ROS image topic no longer has any subscribers
     currNumSubscribers = ros_cam_pub_.getNumSubscribers();
+    std::cout<<"currNumSubscribers : "<<currNumSubscribers<<std::endl;
     if (currNumSubscribers > 0 && prevNumSubscribers <= 0) {
       if (cam_params_.ext_trigger_mode) {
-        if (setExtTriggerMode(cam_params_.frame_rate, cam_params_.ext_trigger_delay) != IS_SUCCESS) {
+        if (setExtTriggerMode(cam_params_.frame_rate, cam_params_.ext_trigger_delay, cam_params_.master) != IS_SUCCESS) {
           ERROR_STREAM("Shutting down driver nodelet for [" << cam_name_ << "]");
           ros::shutdown();
           return;
         }
         INFO_STREAM("[" << cam_name_ << "] set to external trigger mode");
+        /* If "master" set the GPIO1 to generate PWM */
+//        if(cam_params_.master){
+//            INFO_STREAM("[" << cam_name_ << "] GPIO1 configured as output (PWM) at " << cam_params_.frame_rate << "hz");
+//            if(GPIOPWMConfig(cam_handle_, cam_params_.frame_rate, true) != IS_SUCCESS){
+//                ERROR_STREAM("Could not set GPIO 1 as outpu (PWM) for " << cam_name_ << "as output" << ")");
+//                return;
+//            }
+//        }
       } else {
         // NOTE: need to copy flash parameters to local copies since
         //       cam_params_.flash_duration is type int, and also sizeof(int)
@@ -950,11 +976,13 @@ void UEyeCamNodelet::frameGrabLoop() {
     prevStartGrab = currStartGrab;
 #endif
 
+//    std::cout<<"master value : "<<cam_params_.master<<std::endl; // ajout jess
     if (isCapturing()) {
       INT eventTimeout = (cam_params_.auto_frame_rate || cam_params_.ext_trigger_mode) ?
           (INT) 2000 : (INT) (1000.0 / cam_params_.frame_rate * 2);
       if (processNextFrame(eventTimeout) != NULL) {
         ros_image_.header.stamp = ros_cam_info_.header.stamp = getImageTimestamp();
+        std::cout<<"newframe for camera "<<cam_params_.master<<std::endl; // ajout jess
         // Process new frame
 #ifdef DEBUG_PRINTOUT_FRAME_GRAB_RATES
         grabbedFrameCount++;
