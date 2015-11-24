@@ -5,6 +5,7 @@
         args="load ueye_cam/ueye_cam_nodelet nodelet_manager">
     <param name="camera_name" type="str" value="stereo/left" /> <!-- == namespace for topics and services -->
     <param name="camera_topic" type="str" value="image_raw" />
+    <param name="stereo" type="bool" value="true" />
     <param name="master" type="bool" value="true" />
     <param name="camera_id" type="int" value="2" /> <!-- 0 = any camera; 1+: camera ID -->
     <param name="camera_intrinsics_file" type="string" value="" /> <!-- default: ~/.ros/camera_info/<camera_name>.yaml -->
@@ -61,6 +62,7 @@
         args="load ueye_cam/ueye_cam_nodelet nodelet_manager">
     <param name="camera_name" type="str" value="stereo/right" /> <!-- == namespace for topics and services -->
     <param name="camera_topic" type="str" value="image_raw" />
+    <param name="stereo" type="bool" value="true" />
     <param name="master" type="bool" value="false" />
     <param name="camera_id" type="int" value="1" /> <!-- 0 = any camera; 1+: camera ID -->
     <param name="camera_intrinsics_file" type="string" value="" /> <!-- default: ~/.ros/camera_info/<camera_name>.yaml -->

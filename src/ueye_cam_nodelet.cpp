@@ -82,6 +82,8 @@ UEyeCamNodelet::UEyeCamNodelet() :
     cam_topic_(DEFAULT_CAMERA_TOPIC),
     cam_intr_filename_(""),
     cam_params_filename_("") {
+  cam_params_.master = 0;
+  cam_params_.stereo = 0;
   cam_params_.image_width = DEFAULT_IMAGE_WIDTH;
   cam_params_.image_height = DEFAULT_IMAGE_HEIGHT;
   cam_params_.image_left = -1;
@@ -125,7 +127,6 @@ UEyeCamNodelet::~UEyeCamNodelet() {
   //}
 }
 
-
 void UEyeCamNodelet::onInit() {
   ros::NodeHandle& nh = getNodeHandle();
   ros::NodeHandle& local_nh = getPrivateNodeHandle();
@@ -162,9 +163,12 @@ void UEyeCamNodelet::onInit() {
     return;
   }
   ros_cfg_->setCallback(f); // this will call configCallback, which will configure the camera's parameters
+
   startFrameGrabber();
   INFO_STREAM(
       "UEye camera [" << cam_name_ << "] initialized on topic " << ros_cam_pub_.getTopic() << endl <<
+      "Stereo:\t\t\t" << cam_params_.stereo << endl <<
+      "Master:\t\t\t" << cam_params_.master << endl <<
       "Width:\t\t\t" << cam_params_.image_width << endl <<
       "Height:\t\t\t" << cam_params_.image_height << endl <<
       "Left Pos.:\t\t" << cam_params_.image_left << endl <<
@@ -445,6 +449,12 @@ INT UEyeCamNodelet::parseROSParams(ros::NodeHandle& local_nh) {
       } else {
         hasNewParams = true;
       }
+    }
+  }
+  if (local_nh.hasParam("stereo")) {
+    local_nh.getParam("stereo", cam_params_.stereo);
+    if (cam_params_.stereo != prevCamParams.stereo) {
+        hasNewParams = true;
     }
   }
   if (local_nh.hasParam("master")) {
@@ -912,7 +922,6 @@ void UEyeCamNodelet::frameGrabLoop() {
     // Initialize live video mode if camera was previously asleep, and ROS image topic has subscribers;
     // and stop live video mode if ROS image topic no longer has any subscribers
     currNumSubscribers = ros_cam_pub_.getNumSubscribers();
-    std::cout<<"currNumSubscribers : "<<currNumSubscribers<<std::endl;
     if (currNumSubscribers > 0 && prevNumSubscribers <= 0) {
       if (cam_params_.ext_trigger_mode) {
         if (setExtTriggerMode(cam_params_.frame_rate, cam_params_.ext_trigger_delay, cam_params_.master) != IS_SUCCESS) {
@@ -921,14 +930,6 @@ void UEyeCamNodelet::frameGrabLoop() {
           return;
         }
         INFO_STREAM("[" << cam_name_ << "] set to external trigger mode");
-        /* If "master" set the GPIO1 to generate PWM */
-//        if(cam_params_.master){
-//            INFO_STREAM("[" << cam_name_ << "] GPIO1 configured as output (PWM) at " << cam_params_.frame_rate << "hz");
-//            if(GPIOPWMConfig(cam_handle_, cam_params_.frame_rate, true) != IS_SUCCESS){
-//                ERROR_STREAM("Could not set GPIO 1 as outpu (PWM) for " << cam_name_ << "as output" << ")");
-//                return;
-//            }
-//        }
       } else {
         // NOTE: need to copy flash parameters to local copies since
         //       cam_params_.flash_duration is type int, and also sizeof(int)
@@ -976,13 +977,12 @@ void UEyeCamNodelet::frameGrabLoop() {
     prevStartGrab = currStartGrab;
 #endif
 
-//    std::cout<<"master value : "<<cam_params_.master<<std::endl; // ajout jess
     if (isCapturing()) {
+
       INT eventTimeout = (cam_params_.auto_frame_rate || cam_params_.ext_trigger_mode) ?
           (INT) 2000 : (INT) (1000.0 / cam_params_.frame_rate * 2);
       if (processNextFrame(eventTimeout) != NULL) {
         ros_image_.header.stamp = ros_cam_info_.header.stamp = getImageTimestamp();
-        std::cout<<"newframe for camera "<<cam_params_.master<<std::endl; // ajout jess
         // Process new frame
 #ifdef DEBUG_PRINTOUT_FRAME_GRAB_RATES
         grabbedFrameCount++;
@@ -1036,6 +1036,7 @@ void UEyeCamNodelet::frameGrabLoop() {
         ros_image_.header.seq = ros_cam_info_.header.seq = ros_frame_count_++;
         ros_image_.header.frame_id = ros_cam_info_.header.frame_id;
 
+        // Publish the single frame (stereo publish is after)
         if (!frame_grab_alive_ || !ros::ok()) break;
         ros_cam_pub_.publish(ros_image_, ros_cam_info_);
       }

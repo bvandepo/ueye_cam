@@ -59,7 +59,6 @@
 #include <boost/thread/mutex.hpp>
 #include <ueye_cam/ueye_cam_driver.hpp>
 
-
 namespace ueye_cam {
 
 

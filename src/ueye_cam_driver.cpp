@@ -937,13 +937,12 @@ INT UEyeCamDriver::setStandbyMode() {
   INT is_err = IS_SUCCESS;
 
   if (extTriggerModeActive()) {
-//      /* set the GPIO1 to generate PWM */
-//      INFO_STREAM("[" << cam_name_ << "] output (PWM) stop)");
-//      if((is_err = GPIOPWMConfig(cam_handle_, 0, false)) != IS_SUCCESS){
-//          ERROR_STREAM("Could not set GPIO 1 as outpu (PWM) for " << cam_name_ << "as output" << ")");
-//          return is_err;
-//      }
-
+      /* set the GPIO1 to generate PWM */
+      INFO_STREAM("[" << cam_name_ << "] output (PWM) stop)");
+      if((is_err = GPIOPWMConfig(cam_handle_, 30, false)) != IS_SUCCESS){
+          ERROR_STREAM("Could not set GPIO 1 as outpu (PWM) for " << cam_name_ << "as output" << ")");
+          return is_err;
+      }
 
       if ((is_err = is_DisableEvent(cam_handle_, IS_SET_EVENT_FRAME)) != IS_SUCCESS) {
         ERROR_STREAM("Could not disable frame event for [" << cam_name_ <<
@@ -962,6 +961,7 @@ INT UEyeCamDriver::setStandbyMode() {
         return is_err;
       }
       DEBUG_STREAM("Stopped external trigger mode for [" << cam_name_ << "]");
+
   } else if (freeRunModeActive()) {
     UINT nMode = IO_FLASH_MODE_OFF;
     if ((is_err = is_IO(cam_handle_, IS_IO_CMD_FLASH_SET_MODE,
@@ -1403,26 +1403,26 @@ INT UEyeCamDriver::GPIOPWMConfig(HIDS hCam, double frame_rate, bool active){
 
     // FOR THE GPIO 1 : OUTPUT
 
-    // Get all GPIOs that can be used as flash output
-    UINT nGPIOs_Flash = 0;
-    INT nRet = is_IO(hCam, IS_IO_CMD_FLASH_GET_SUPPORTED_GPIOS,
-                    (void*)&nGPIOs_Flash, sizeof(nGPIOs_Flash));
+//    // Get all GPIOs that can be used as flash output
+//    UINT nGPIOs_Flash = 0;
+//    INT nRet = is_IO(hCam, IS_IO_CMD_FLASH_GET_SUPPORTED_GPIOS,
+//                    (void*)&nGPIOs_Flash, sizeof(nGPIOs_Flash));
 
-    // Get all GPIOs that can be used for the PWM
-    UINT nGPIOs_PWM = 0;
-    nRet = is_IO(hCam, IS_IO_CMD_PWM_GET_SUPPORTED_GPIOS,
-                    (void*)&nGPIOs_PWM, sizeof(nGPIOs_PWM));
+//    // Get all GPIOs that can be used for the PWM
+//    UINT nGPIOs_PWM = 0;
+//    nRet = is_IO(hCam, IS_IO_CMD_PWM_GET_SUPPORTED_GPIOS,
+//                    (void*)&nGPIOs_PWM, sizeof(nGPIOs_PWM));
 
     // Set GPIO1 as PWM output
     UINT nMode = IO_GPIO_1;
-    nRet = is_IO(hCam, IS_IO_CMD_PWM_SET_MODE,
+    INT nRet = is_IO(hCam, IS_IO_CMD_PWM_SET_MODE,
                 (void*)&nMode, sizeof(nMode));
     IO_PWM_PARAMS m_pwmParams;
 
     // Set the values of the PWM parameters
     m_pwmParams.dblFrequency_Hz = frame_rate;
-    m_pwmParams.dblDutyCycle = 0.1; //TODO: What does the duty change?(active ? 0.1:0)
-    std::cout<<"active PWM : "<<active<<std::endl;
+    m_pwmParams.dblDutyCycle = (active ? 0.1:0.0); //TODO: What does the duty change?(active ? 0.1:0)
+    std::cout<<"PWM active : "<<active<<", dutycycle : "<< (active ? 0.1:0)<<std::endl;
     nRet = is_IO(hCam, IS_IO_CMD_PWM_SET_PARAMS,
                 (void*)&m_pwmParams, sizeof(m_pwmParams));
     if(nRet != IS_SUCCESS){ std::cout << "error : pwm not set." << std::endl;}

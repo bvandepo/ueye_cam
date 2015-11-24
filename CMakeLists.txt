@@ -20,6 +20,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+#  std_msgs
+#  message_generation
   nodelet
   dynamic_reconfigure
   cv_bridge
@@ -73,11 +75,22 @@ set(UEYECAM_NODELET_HEADERS
 generate_dynamic_reconfigure_options(
   cfg/UEyeCam.cfg
   )
+  
+#add_message_files(
+#  FILES
+#  stereo_im.msg
+#)
+
+#generate_messages(
+#  DEPENDENCIES
+#  sensor_msgs
+#  std_msgs
+#)
 
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${UEYECAM_LIB_NAME} ${UEYECAM_NODELET_NAME}
-  CATKIN_DEPENDS roscpp nodelet dynamic_reconfigure cv_bridge image_transport sensor_msgs camera_calibration_parsers camera_info_manager
+  CATKIN_DEPENDS roscpp nodelet dynamic_reconfigure cv_bridge image_transport sensor_msgs camera_calibration_parsers camera_info_manager #message_runtime
   DEPENDS OpenCV
   )
 
