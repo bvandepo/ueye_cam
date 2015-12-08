@@ -858,21 +858,21 @@ INT UEyeCamDriver::setExtTriggerMode(double frame_rate, INT trigger_delay, bool 
       return is_err;
     }
 
-    /* If "master" set the GPIO1 to generate PWM */
+    /* If "master" set the GPIO2 to generate PWM */
     if(master){
-        INFO_STREAM("[" << cam_name_ << "] GPIO1 configured as output (PWM) at " << frame_rate << "hz");
+        INFO_STREAM("[" << cam_name_ << "] GPIO2 configured as output (PWM) at " << frame_rate << "hz");
         if(GPIOPWMConfig(cam_handle_, frame_rate, true) != IS_SUCCESS){
-            ERROR_STREAM("Could not set GPIO 1 as output (PWM) for " << cam_name_ << "as output" << ")");
+            ERROR_STREAM("Could not set GPIO 2 as output (PWM) for " << cam_name_ << "as output" << ")");
             return is_err;
         }
     }
 
-    /* Set GPIO2 as input for trigger */
+    /* Set GPIO1 as input for trigger */
     if(GPIOInputConfig(cam_handle_) != IS_SUCCESS){
-        ERROR_STREAM("Could not set GPIO 2 as input for " << cam_name_ << "as output" << ")");
+        ERROR_STREAM("Could not set GPIO1 as input for " << cam_name_ << "as output" << ")");
         return is_err;
     }
-    INFO_STREAM("[" <<cam_name_ << "] GPIO2 configured as input for triggering");
+    INFO_STREAM("[" <<cam_name_ << "] GPIO1 configured as input for triggering");
     
     /* Set to trigger on falling edge */
     if ((is_err = is_SetExternalTrigger(cam_handle_, IS_SET_TRIGGER_HI_LO)) != IS_SUCCESS) {
@@ -937,10 +937,10 @@ INT UEyeCamDriver::setStandbyMode() {
   INT is_err = IS_SUCCESS;
 
   if (extTriggerModeActive()) {
-      /* set the GPIO1 to generate PWM */
+      /* set the GPIO2 to generate PWM */
       INFO_STREAM("[" << cam_name_ << "] output (PWM) stop)");
       if((is_err = GPIOPWMConfig(cam_handle_, 30, false)) != IS_SUCCESS){
-          ERROR_STREAM("Could not set GPIO 1 as outpu (PWM) for " << cam_name_ << "as output" << ")");
+          ERROR_STREAM("Could not set GPIO2 as outpu (PWM) for " << cam_name_ << "as output" << ")");
           return is_err;
       }
 
@@ -1401,7 +1401,7 @@ bool UEyeCamDriver::getTimestamp(UEYETIME *timestamp) {
 
 INT UEyeCamDriver::GPIOPWMConfig(HIDS hCam, double frame_rate, bool active){
 
-    // FOR THE GPIO 1 : OUTPUT
+    // FOR THE GPIO 2 : OUTPUT
 
 //    // Get all GPIOs that can be used as flash output
 //    UINT nGPIOs_Flash = 0;
@@ -1413,8 +1413,8 @@ INT UEyeCamDriver::GPIOPWMConfig(HIDS hCam, double frame_rate, bool active){
 //    nRet = is_IO(hCam, IS_IO_CMD_PWM_GET_SUPPORTED_GPIOS,
 //                    (void*)&nGPIOs_PWM, sizeof(nGPIOs_PWM));
 
-    // Set GPIO1 as PWM output
-    UINT nMode = IO_GPIO_1;
+    // Set GPIO2 as PWM output
+    UINT nMode = IO_GPIO_2;
     INT nRet = is_IO(hCam, IS_IO_CMD_PWM_SET_MODE,
                 (void*)&nMode, sizeof(nMode));
     IO_PWM_PARAMS m_pwmParams;
@@ -1431,18 +1431,18 @@ INT UEyeCamDriver::GPIOPWMConfig(HIDS hCam, double frame_rate, bool active){
 }
 
 INT UEyeCamDriver::GPIOInputConfig(HIDS hCam){
-    // FOR THE GPIO 2 : INPUT
+    // FOR THE GPIO 1 : INPUT
 
     IO_GPIO_CONFIGURATION gpioConfiguration;
 
-    // Set configuration of GPIO2
-    gpioConfiguration.u32Gpio = IO_GPIO_2;
+    // Set configuration of GPIO1
+    gpioConfiguration.u32Gpio = IO_GPIO_1;
     gpioConfiguration.u32Configuration = IS_GPIO_TRIGGER;
     gpioConfiguration.u32State = 0;
 
     INT nRet = is_IO(hCam, IS_IO_CMD_GPIOS_SET_CONFIGURATION, (void*)&gpioConfiguration,
                 sizeof(gpioConfiguration));
-    if(nRet != IS_SUCCESS){ std::cout << "error : GPIO2 config not done : " << nRet << std::endl;}
+    if(nRet != IS_SUCCESS){ std::cout << "error : GPIO1 config not done : " << nRet << std::endl;}
 
     return nRet;
 }
